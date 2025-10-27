@@ -5,36 +5,29 @@ from app.key_manager import bootstrap_keys
 from app.crypto_utils import generate_rsa_keypair, jwk_from_private_pem
 
 def test_db_bootstrap_and_queries(monkeypatch):
-    # 임시 DB로 교체
     fd, path = tempfile.mkstemp(prefix="jwks_cov_", suffix=".db")
     os.close(fd)
     monkeypatch.setattr(config, "DB_FILE", __import__("pathlib").Path(path))
 
-    # 스키마 생성
     conn = get_conn()
     init_db(conn)
     conn.close()
 
-    # 부트스트랩: 만료 1개, 유효 1개
     bootstrap_keys()
 
     conn = get_conn()
     now = int(time.time())
 
-    # 유효 키 조회
     row_valid = get_one_key(conn, expired=False, now_ts=now)
     assert row_valid is not None and row_valid["exp"] > now
 
-    # 만료 키 조회
     row_exp = get_one_key(conn, expired=True, now_ts=now)
     assert row_exp is not None and row_exp["exp"] <= now
 
-    # 유효 키 전체
     all_valid = list(get_all_valid_keys(conn, now_ts=now))
     assert len(all_valid) >= 1
     conn.close()
 
-    # jwk 생성 경로 커버
     jwk = jwk_from_private_pem(row_valid["key"], row_valid["kid"])
     for f in ["kty","alg","use","kid","n","e"]:
         assert f in jwk
@@ -51,7 +44,7 @@ def test_manual_insert_key_and_select(monkeypatch):
 
     priv_pem, _ = generate_rsa_keypair()
     now = int(time.time())
-    # 바로 만료되는 키 하나, 유효 키 하나 삽입
+
     kid1 = insert_key(conn, priv_pem.decode(), now - 5)
     kid2 = insert_key(conn, priv_pem.decode(), now + 3600)
 
