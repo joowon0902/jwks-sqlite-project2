@@ -4,9 +4,9 @@ This extends my Project 1 JWKS server to persist RSA private keys in SQLite, sig
 
 ## How to run
 
-python -m venv .venv  
+python -m venv .venv
 . .venv/Scripts/activate
-pip install -r requirements.txt  
+pip install -r requirements.txt
 python -m uvicorn app.main:app
 
 Server runs on http://127.0.0.1:8000
