@@ -2,6 +2,13 @@
 
 This extends my Project 1 JWKS server to persist RSA private keys in SQLite, sign JWTs via POST /auth, and serve JWK Set via GET /.well-known/jwks.json. All SQL uses parameterized queries.
 
+
+**Language**: Python 3.11
+**Framework**: FastAPI with Uvicorn ASGI server
+**Database**: SQLite 3
+**Dependencies**: listed in requirements.txt (fastapi, uvicorn, python-jose, pytest, coverage, sqlite3)
+**Platform Tested**: Windows 11 (64-bit)
+
 ## How to run
 
 python -m venv .venv
