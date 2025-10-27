@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 import time
 from typing import Optional
-
+from fastapi.responses import PlainTextResponse, JSONResponse
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import jwt
@@ -10,31 +10,28 @@ from .config import ALGORITHM, ISSUER, AUDIENCE
 from .db import get_conn, init_db, get_one_key, get_all_valid_keys
 from .crypto_utils import private_pem_to_key, jwk_from_private_pem
 from .key_manager import bootstrap_keys
-from .models import AuthRequest, TokenResponse, JWKS
+from .models import AuthRequest, JWKS
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 앱 시작 시 DB 스키마 초기화 및 키 시드
     conn = get_conn()
     init_db(conn)
     conn.close()
     bootstrap_keys()
     yield
-    # 종료 시 필요한 정리 작업이 있으면 여기서 처리
 
 
 app = FastAPI(title="JWKS with SQLite", version="2.0", lifespan=lifespan)
-security = HTTPBasic(auto_error=False)  # Basic 미제공 시에도 401 대신 통과
+security = HTTPBasic(auto_error=False)
 
 
-@app.post("/auth", response_model=TokenResponse)
+@app.post("/auth")
 async def issue_token(
     request: Request,
     body: Optional[AuthRequest] = None,
     credentials: Optional[HTTPBasicCredentials] = Depends(security),
 ):
-    # Basic 또는 JSON 바디 중 하나로 username을 받음
     username = None
     if credentials and credentials.username:
         username = credentials.username
@@ -53,7 +50,7 @@ async def issue_token(
     if not row:
         raise HTTPException(status_code=500, detail="no suitable key found")
 
-    priv = private_pem_to_key(row["key"])  # PEM 문자열을 로드해 key 객체로
+    priv = private_pem_to_key(row["key"])
     claims = {
         "sub": username,
         "iat": now,
@@ -68,7 +65,11 @@ async def issue_token(
         algorithm=ALGORITHM,
         headers={"kid": str(row["kid"])},
     )
-    return TokenResponse(access_token=token)
+
+    accept = (request.headers.get("accept") or "").lower()
+    if "application/json" in accept or request.query_params.get("json") is not None:
+        return JSONResponse({"access_token": token, "token_type": "bearer"})
+    return PlainTextResponse(token)
 
 
 @app.get("/.well-known/jwks.json", response_model=JWKS)
